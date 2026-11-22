@@ -1,0 +1,96 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": [
+      "_id",
+      "document_type",
+      "schema_version",
+      "source_id",
+      "research_question",
+      "sampling_design",
+      "study_localities",
+      "focal_taxa",
+      "interpretation_limits",
+      "license_and_usage",
+      "created_at"
+    ],
+    "properties": {
+      "_id": {
+        "bsonType": "string",
+        "description": "Identificador del expediente de estudio (ej: STD_BAT2007)"
+      },
+      "document_type": {
+        "enum": ["study_dossier"],
+        "description": "Tipo fijo de documento"
+      },
+      "schema_version": {
+        "bsonType": "int",
+        "minimum": 1
+      },
+      "source_id": {
+        "bsonType": "string",
+        "description": "FK hacia la tabla source de PostgreSQL"
+      },
+      "doi_or_uri": {
+        "bsonType": ["string", "null"]
+      },
+      "research_question": {
+        "bsonType": "string"
+      },
+      "sampling_design": {
+        "bsonType": "object",
+        "required": ["methods", "instruments"],
+        "properties": {
+          "effort": { "bsonType": "string" },
+          "units": { "bsonType": "string" },
+          "instruments": {
+            "bsonType": "array",
+            "items": { "bsonType": "string" }
+          },
+          "methods": {
+            "bsonType": "array",
+            "items": { "bsonType": "string" }
+          }
+        }
+      },
+      "study_localities": {
+        "bsonType": "array",
+        "items": { "bsonType": "string" },
+        "description": "Lista de locality_id relacionales"
+      },
+      "study_period": {
+        "bsonType": "object",
+        "properties": {
+          "period_start": { "bsonType": "string" },
+          "period_end": { "bsonType": "string" },
+          "temporal_notes": { "bsonType": "string" }
+        }
+      },
+      "focal_taxa": {
+        "bsonType": "array",
+        "items": { "bsonType": "string" },
+        "description": "Lista de taxon_id focales investigados"
+      },
+      "interpretation_limits": {
+        "bsonType": "array",
+        "items": { "bsonType": "string" }
+      },
+      "license_and_usage": {
+        "bsonType": "object",
+        "required": ["license_id", "can_redistribute_fulltext"],
+        "properties": {
+          "license_id": { "bsonType": "string" },
+          "can_redistribute_fulltext": { "bsonType": "bool" },
+          "attribution": { "bsonType": "string" }
+        }
+      },
+      "checksum": {
+        "bsonType": ["string", "null"]
+      },
+      "dataset_tag": {
+        "bsonType": "string"
+      },
+      "created_at": { "bsonType": ["date", "string"] }
+    }
+  }
+}
