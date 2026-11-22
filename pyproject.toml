@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "biolink-backend"
+version = "0.1.0"
+description = "Backend modular y API REST (/api/v1) de BioLink con persistencia poliglota en PostgreSQL, MongoDB y Neo4j."
+readme = "README.md"
+requires-python = ">=3.12,<3.16"
+dependencies = [
+    "fastapi>=0.115.0,<1.0.0",
+    "uvicorn[standard]>=0.32.0,<1.0.0",
+    "pydantic>=2.10.0,<3.0.0",
+    "pydantic-settings>=2.6.0,<3.0.0",
+    "psycopg[binary,pool]>=3.2.0,<4.0.0",
+    "pymongo>=4.10.0,<5.0.0",
+    "neo4j>=5.26.0,<7.0.0",
+    "python-dotenv>=1.0.1,<2.0.0",
+    "httpx>=0.27.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0,<10.0.0",
+]
+
+[project.scripts]
+biolink-api = "biolink_backend.main:run"
+biolink-worker = "biolink_backend.workers.outbox_worker:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: pruebas de integracion que requieren contenedores Docker activos de PostgreSQL, MongoDB y Neo4j",
+]

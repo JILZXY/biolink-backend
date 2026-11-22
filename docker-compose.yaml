@@ -1,0 +1,184 @@
+name: biolink-backend
+
+# ==============================================================================
+# BioLink Backend - Orquestacion Privada del Monolito Modular y Sus Tres Motores
+# Reglas operativas:
+#   - Compose completamente independiente de biolink-benchmarking.
+#   - Red privada interna: biolink_backend_net.
+#   - Puertos locales opcionales enlazados exclusivamente a 127.0.0.1.
+#   - Presupuesto total objetivo <= 4096 MiB:
+#       PostgreSQL (768m) + MongoDB (768m) + Neo4j (1024m)
+#       + API (320m) + Worker (192m) = 3072 MiB (1024 MiB margen libre)
+# ==============================================================================
+
+services:
+  relational-db:
+    image: ${POSTGRES_IMAGE:-postgres:18.7}
+    container_name: biolink-prod-postgresql
+    restart: unless-stopped
+    mem_limit: ${POSTGRES_MEM_LIMIT_MB:-768}m
+    cpus: 1.5
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-biolink}
+      POSTGRES_USER: ${POSTGRES_USER:-biolink_app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD en .env}
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=192MB"
+      - "-c"
+      - "work_mem=8MB"
+      - "-c"
+      - "maintenance_work_mem=64MB"
+      - "-c"
+      - "effective_cache_size=384MB"
+      - "-c"
+      - "max_connections=50"
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgresql_prod_data:/var/lib/postgresql
+      - ./database/postgresql/migrations:/docker-entrypoint-initdb.d:ro
+    networks:
+      - biolink_backend_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -h 127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  document-db:
+    image: ${MONGODB_IMAGE:-mongo:8.0.38}
+    container_name: biolink-prod-mongodb
+    restart: unless-stopped
+    mem_limit: ${MONGODB_MEM_LIMIT_MB:-768}m
+    cpus: 1.5
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER:-biolink_app}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:?Configure MONGODB_PASSWORD en .env}
+      MONGO_INITDB_DATABASE: ${MONGODB_DB:-biolink_documents}
+    command:
+      - "--wiredTigerCacheSizeGB"
+      - "0.25"
+    ports:
+      - "127.0.0.1:${MONGODB_PORT:-27017}:27017"
+    volumes:
+      - mongodb_prod_data:/data/db
+    networks:
+      - biolink_backend_net
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet -u \"$$MONGO_INITDB_ROOT_USERNAME\" -p \"$$MONGO_INITDB_ROOT_PASSWORD\" --authenticationDatabase admin --eval 'db.adminCommand(\"ping\").ok' | grep -q 1"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  graph-db:
+    image: ${NEO4J_IMAGE:-neo4j:2026.10.2-community}
+    container_name: biolink-prod-neo4j
+    restart: unless-stopped
+    mem_limit: ${NEO4J_MEM_LIMIT_MB:-1024}m
+    cpus: 1.5
+    environment:
+      NEO4J_AUTH: "${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?Configure NEO4J_PASSWORD en .env}"
+      # Ajuste estricto segun ADR-004 para evitar MemoryPoolOutOfMemoryError sin subir 1024 MiB
+      NEO4J_server_memory_heap_initial__size: ${NEO4J_HEAP_INITIAL:-256m}
+      NEO4J_server_memory_heap_max__size: ${NEO4J_HEAP_MAX:-384m}
+      NEO4J_server_memory_pagecache_size: ${NEO4J_PAGECACHE:-256m}
+      NEO4J_dbms_memory_transaction_total_max: ${NEO4J_TX_TOTAL_MAX:-256m}
+      NEO4J_db_memory_transaction_max: ${NEO4J_TX_MAX:-64m}
+      NEO4J_dbms_usage__report_enabled: "false"
+    ports:
+      - "127.0.0.1:${NEO4J_BOLT_PORT:-7687}:7687"
+      - "127.0.0.1:${NEO4J_HTTP_PORT:-7474}:7474"
+    volumes:
+      - neo4j_prod_data:/data
+    networks:
+      - biolink_backend_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://127.0.0.1:7474 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: biolink-prod-api
+    restart: unless-stopped
+    mem_limit: ${BACKEND_MEM_LIMIT_MB:-320}m
+    cpus: 1.0
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_HOST: relational-db
+      POSTGRES_PORT: 5432
+      MONGODB_HOST: document-db
+      MONGODB_PORT: 27017
+      NEO4J_HOST: graph-db
+      NEO4J_BOLT_PORT: 7687
+      BACKEND_HOST: 0.0.0.0
+      BACKEND_PORT: 8000
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      relational-db:
+        condition: service_healthy
+      document-db:
+        condition: service_healthy
+      graph-db:
+        condition: service_healthy
+    networks:
+      - biolink_backend_net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/live', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: biolink-prod-worker
+    restart: unless-stopped
+    mem_limit: ${WORKER_MEM_LIMIT_MB:-192}m
+    cpus: 0.5
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_HOST: relational-db
+      POSTGRES_PORT: 5432
+      MONGODB_HOST: document-db
+      MONGODB_PORT: 27017
+      NEO4J_HOST: graph-db
+      NEO4J_BOLT_PORT: 7687
+    command: ["python", "-m", "biolink_backend.workers.outbox_worker"]
+    depends_on:
+      relational-db:
+        condition: service_healthy
+      document-db:
+        condition: service_healthy
+      graph-db:
+        condition: service_healthy
+    networks:
+      - biolink_backend_net
+
+volumes:
+  postgresql_prod_data:
+  mongodb_prod_data:
+  neo4j_prod_data:
+
+networks:
+  biolink_backend_net:
+    driver: bridge

@@ -1,0 +1,120 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": [
+      "_id",
+      "document_type",
+      "schema_version",
+      "document_version",
+      "taxon_id",
+      "accepted_name",
+      "summary",
+      "sections",
+      "claims",
+      "updated_at"
+    ],
+    "properties": {
+      "_id": {
+        "bsonType": "string",
+        "description": "Identificador canonico del taxon (taxon_id relacional)"
+      },
+      "document_type": {
+        "enum": ["taxon_dossier"],
+        "description": "Tipo fijo de documento para consultas polimorficas"
+      },
+      "schema_version": {
+        "bsonType": "int",
+        "minimum": 1,
+        "description": "Version de la estructura del esquema documental"
+      },
+      "document_version": {
+        "bsonType": "int",
+        "minimum": 1,
+        "description": "Contador monotono para concurrencia optimista y versionado"
+      },
+      "taxon_id": {
+        "bsonType": "string",
+        "description": "Clave foranea referencial hacia la tabla taxon de PostgreSQL"
+      },
+      "accepted_name": {
+        "bsonType": "string",
+        "description": "Nombre cientifico aceptado para busquedas descriptivas"
+      },
+      "summary": {
+        "bsonType": "object",
+        "required": ["description"],
+        "properties": {
+          "description": {
+            "bsonType": "object",
+            "required": ["value", "source_refs"],
+            "properties": {
+              "value": { "bsonType": "string" },
+              "source_refs": {
+                "bsonType": "array",
+                "items": { "bsonType": "string" }
+              },
+              "locators": {
+                "bsonType": "array",
+                "items": { "bsonType": "string" }
+              }
+            }
+          }
+        }
+      },
+      "sections": {
+        "bsonType": "object",
+        "properties": {
+          "morphology": { "bsonType": "array" },
+          "ecology": {
+            "bsonType": "object",
+            "properties": {
+              "habitats": { "bsonType": "array" },
+              "diet": { "bsonType": "array" },
+              "activity_patterns": { "bsonType": "array" },
+              "notes": { "bsonType": "array" }
+            }
+          },
+          "conservation": { "bsonType": "array" },
+          "distribution": { "bsonType": "array" }
+        }
+      },
+      "media": {
+        "bsonType": "array",
+        "items": {
+          "bsonType": "object",
+          "required": ["media_id", "media_type", "uri", "license", "attribution", "source_ref"],
+          "properties": {
+            "media_id": { "bsonType": "string" },
+            "media_type": { "enum": ["image", "audio", "video", "document"] },
+            "uri": { "bsonType": "string" },
+            "license": { "bsonType": "string" },
+            "attribution": { "bsonType": "string" },
+            "source_ref": { "bsonType": "string" },
+            "checksum": { "bsonType": "string" }
+          }
+        }
+      },
+      "claims": {
+        "bsonType": "array",
+        "items": {
+          "bsonType": "object",
+          "required": ["claim_id", "field", "value", "source_id", "source_locator"],
+          "properties": {
+            "claim_id": { "bsonType": "string" },
+            "field": { "bsonType": "string" },
+            "value": { "bsonType": ["string", "number", "bool", "array", "object"] },
+            "source_id": { "bsonType": "string" },
+            "source_locator": { "bsonType": "string" },
+            "created_at": { "bsonType": ["date", "string"] }
+          }
+        }
+      },
+      "dataset_tag": {
+        "bsonType": "string",
+        "description": "Etiqueta de procedencia (SCIENTIFIC_FIXTURE o similar)"
+      },
+      "created_at": { "bsonType": ["date", "string"] },
+      "updated_at": { "bsonType": ["date", "string"] }
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "$jsonSchema": {
+    "bsonType": "object",
+    "required": [
+      "_id",
+      "document_type",
+      "schema_version",
+      "import_batch_id",
+      "source_id",
+      "external_record_id",
+      "provider",
+      "retrieved_at",
+      "checksum",
+      "raw_payload",
+      "license_metadata",
+      "transformation_metadata"
+    ],
+    "properties": {
+      "_id": {
+        "bsonType": "string",
+        "description": "Identificador inmutable del registro crudo"
+      },
+      "document_type": {
+        "enum": ["raw_source_record"],
+        "description": "Tipo fijo de documento"
+      },
+      "schema_version": {
+        "bsonType": "int",
+        "minimum": 1
+      },
+      "import_batch_id": {
+        "bsonType": "string",
+        "description": "FK a import_batch en PostgreSQL"
+      },
+      "source_id": {
+        "bsonType": "string",
+        "description": "FK a source en PostgreSQL"
+      },
+      "external_record_id": {
+        "bsonType": "string",
+        "description": "Identificador original asignado por el proveedor externo"
+      },
+      "provider": {
+        "bsonType": "string",
+        "description": "Nombre de la fuente/proveedor (GBIF, EncicloVida, Literatura, etc.)"
+      },
+      "retrieved_at": {
+        "bsonType": ["date", "string"]
+      },
+      "checksum": {
+        "bsonType": "string",
+        "description": "Hash criptografico SHA-256 del contenido crudo para verificar inmutabilidad"
+      },
+      "raw_payload": {
+        "bsonType": "object",
+        "description": "Contenido original inalterado tal como se recibio del proveedor"
+      },
+      "license_metadata": {
+        "bsonType": "object",
+        "required": ["license_id", "redistribution_permitted"],
+        "properties": {
+          "license_id": { "bsonType": "string" },
+          "terms_url": { "bsonType": ["string", "null"] },
+          "redistribution_permitted": { "bsonType": "bool" },
+          "full_text_stored": { "bsonType": "bool" },
+          "attribution": { "bsonType": ["string", "null"] }
+        }
+      },
+      "transformation_metadata": {
+        "bsonType": "object",
+        "required": ["normalized_at", "validation_status"],
+        "properties": {
+          "normalized_at": { "bsonType": ["date", "string"] },
+          "target_canonical_taxon_id": { "bsonType": ["string", "null"] },
+          "validation_status": {
+            "enum": ["PENDING", "VALID", "INVALID", "UNRESOLVED", "DUPLICATE"]
+          },
+          "warnings": {
+            "bsonType": "array",
+            "items": { "bsonType": "string" }
+          }
+        }
+      },
+      "dataset_tag": {
+        "bsonType": "string"
+      }
+    }
+  }
+}
