@@ -1,0 +1,6149 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "BioLink API",
+    "description": "API REST integrada de biolink-backend para consultas ecologicas, curaduria cientifica y administracion sobre PostgreSQL, MongoDB y Neo4j.",
+    "contact": {
+      "name": "Equipo BioLink",
+      "url": "https://biolink.local/"
+    },
+    "license": {
+      "name": "Academic & Research Use"
+    },
+    "version": "0.1.0"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8000",
+      "description": "Servidor local de desarrollo biolink-backend"
+    }
+  ],
+  "paths": {
+    "/api/v1/health/live": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Liveness probe del proceso API",
+        "description": "Confirma que el proceso FastAPI esta activo y atendiendo solicitudes sin consultar las bases de datos.",
+        "operationId": "health_live_api_v1_health_live_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LivenessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Readiness probe hacia PostgreSQL, MongoDB y Neo4j",
+        "description": "Verifica conectividad real contra los tres motores definitivos antes de aceptar trafico operativo.",
+        "operationId": "health_ready_api_v1_health_ready_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Una o mas bases de datos requeridas (PostgreSQL, MongoDB o Neo4j) no estan disponibles.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Estado general consolidado de BioLink Backend",
+        "description": "Combina liveness del proceso, readiness real de los tres motores y presupuesto de memoria configurado.",
+        "operationId": "health_consolidated_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsolidatedHealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "El proceso esta vivo pero el estado general esta degradado por alguna dependencia.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsolidatedHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Autenticacion de usuario interno (Curador / Revisor / Admin)",
+        "description": "Autentica credenciales contra app_user en PostgreSQL y emite sesion segura HttpOnly + token opaco.",
+        "operationId": "login_internal_user_api_v1_auth_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSessionResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Cerrar sesion administrativa",
+        "description": "Revoca inmediatamente el token activo en user_session y limpia la cookie HttpOnly.",
+        "operationId": "logout_internal_user_api_v1_auth_logout_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponseSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Consultar identidad y roles de la sesion actual",
+        "operationId": "get_authenticated_profile_api_v1_auth_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthenticatedUserSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/taxa": {
+      "get": {
+        "tags": [
+          "Taxa"
+        ],
+        "summary": "OP-01: Buscar taxones",
+        "description": "Busca taxones por nombre aceptado, sinonimo, grafia original o identificador externo con paginacion.",
+        "operationId": "search_taxa_api_v1_taxa_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 120
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre cientifico, sinonimo o ID externo",
+              "title": "Q"
+            },
+            "description": "Nombre cientifico, sinonimo o ID externo"
+          },
+          {
+            "name": "taxonomic_rank",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "SPECIES, GENUS, MORPHOSPECIES, etc.",
+              "title": "Taxonomic Rank"
+            },
+            "description": "SPECIES, GENUS, MORPHOSPECIES, etc."
+          },
+          {
+            "name": "organism_group",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ANIMAL o PLANT",
+              "title": "Organism Group"
+            },
+            "description": "ANIMAL o PLANT"
+          },
+          {
+            "name": "taxonomic_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ACCEPTED, UNRESOLVED_TO_SPECIES, NEEDS_RECONCILIATION, etc.",
+              "title": "Taxonomic Status"
+            },
+            "description": "ACCEPTED, UNRESOLVED_TO_SPECIES, NEEDS_RECONCILIATION, etc."
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "accepted_name",
+                "taxon_id",
+                "taxonomic_rank"
+              ],
+              "type": "string",
+              "default": "accepted_name",
+              "title": "Sort By"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "asc",
+              "title": "Sort Order"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonSearchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/taxa/{taxon_id}": {
+      "get": {
+        "tags": [
+          "Taxa"
+        ],
+        "summary": "OP-02: Consultar ficha de taxon",
+        "description": "Integra la identidad taxonomica canonica relacional con el expediente documental en MongoDB.",
+        "operationId": "get_taxon_fiche_api_v1_taxa__taxon_id__get",
+        "parameters": [
+          {
+            "name": "taxon_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Taxon Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/taxa/{taxon_id}/interactions": {
+      "get": {
+        "tags": [
+          "Taxa"
+        ],
+        "summary": "OP-03: Listar interacciones de un taxon",
+        "description": "Lista afirmaciones PUBLISHED documentadas donde participa el taxon, excluyendo borradores o retiradas.",
+        "operationId": "list_taxon_interactions_api_v1_taxa__taxon_id__interactions_get",
+        "parameters": [
+          {
+            "name": "taxon_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Taxon Id"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "any",
+                "actor",
+                "target"
+              ],
+              "type": "string",
+              "default": "any",
+              "title": "Role"
+            }
+          },
+          {
+            "name": "interaction_type_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Interaction Type Code"
+            }
+          },
+          {
+            "name": "locality_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Locality Id"
+            }
+          },
+          {
+            "name": "method_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Method Code"
+            }
+          },
+          {
+            "name": "period_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Formato ISO parcial YYYY, YYYY-MM o YYYY-MM-DD",
+              "title": "Period Start"
+            },
+            "description": "Formato ISO parcial YYYY, YYYY-MM o YYYY-MM-DD"
+          },
+          {
+            "name": "period_end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Formato ISO parcial YYYY, YYYY-MM o YYYY-MM-DD",
+              "title": "Period End"
+            },
+            "description": "Formato ISO parcial YYYY, YYYY-MM o YYYY-MM-DD"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaxonInteractionsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/taxa/{taxon_id}/connectivity": {
+      "get": {
+        "tags": [
+          "Taxa"
+        ],
+        "summary": "OP-07: Calcular conectividad descriptiva",
+        "description": "Calcula numero de taxones contraparte distintos en la red documentada (no equivale a abundancia).",
+        "operationId": "get_taxon_connectivity_api_v1_taxa__taxon_id__connectivity_get",
+        "parameters": [
+          {
+            "name": "taxon_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Taxon Id"
+            }
+          },
+          {
+            "name": "locality_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Locality Id"
+            }
+          },
+          {
+            "name": "interaction_type_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Interaction Type Code"
+            }
+          },
+          {
+            "name": "period_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period Start"
+            }
+          },
+          {
+            "name": "period_end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectivityResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/interactions/{assertion_id}": {
+      "get": {
+        "tags": [
+          "Interactions"
+        ],
+        "summary": "OP-04: Consultar detalle y evidencia de interaccion",
+        "description": "Expone evidencia, citas bibliograficas, localizadores, limites interpretativos y estado en grafo para una afirmacion PUBLISHED.",
+        "operationId": "get_interaction_detail_api_v1_interactions__assertion_id__get",
+        "parameters": [
+          {
+            "name": "assertion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assertion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/subgraph": {
+      "get": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "OP-05: Filtrar subred documentada",
+        "description": "Construye subred ecologica filtrada sobre afirmaciones PUBLISHED sin mezclar localidades externas ni indeterminadas.",
+        "operationId": "filter_documented_subgraph_api_v1_network_subgraph_get",
+        "parameters": [
+          {
+            "name": "taxon_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Taxon Id"
+            }
+          },
+          {
+            "name": "locality_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Locality Id"
+            }
+          },
+          {
+            "name": "protected_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Protected Status"
+            }
+          },
+          {
+            "name": "spatial_validation_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Spatial Validation Status"
+            }
+          },
+          {
+            "name": "interaction_type_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Interaction Type Code"
+            }
+          },
+          {
+            "name": "method_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Method Code"
+            }
+          },
+          {
+            "name": "source_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "period_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period Start"
+            }
+          },
+          {
+            "name": "period_end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period End"
+            }
+          },
+          {
+            "name": "max_depth",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3,
+              "minimum": 1,
+              "default": 1,
+              "title": "Max Depth"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubgraphResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/network/compare-localities": {
+      "get": {
+        "tags": [
+          "Network"
+        ],
+        "summary": "OP-06: Comparar localidades",
+        "description": "Compara redes documentadas de dos localidades distintas (ej. Montes Azules vs Playon de la Gloria) manteniendo contextos separados.",
+        "operationId": "compare_localities_api_v1_network_compare_localities_get",
+        "parameters": [
+          {
+            "name": "locality_id_a",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Identificador de la primera localidad",
+              "title": "Locality Id A"
+            },
+            "description": "Identificador de la primera localidad"
+          },
+          {
+            "name": "locality_id_b",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Identificador de la segunda localidad",
+              "title": "Locality Id B"
+            },
+            "description": "Identificador de la segunda localidad"
+          },
+          {
+            "name": "interaction_type_code",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Interaction Type Code"
+            }
+          },
+          {
+            "name": "period_start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period Start"
+            }
+          },
+          {
+            "name": "period_end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Period End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalityComparisonResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sources/{source_id}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "OP-08: Consultar fuente o estudio",
+        "description": "Devuelve cita bibliografica, versiones de dataset, licencias y expediente metodologico documental.",
+        "operationId": "get_source_detail_api_v1_sources__source_id__get",
+        "parameters": [
+          {
+            "name": "source_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/occurrences": {
+      "get": {
+        "tags": [
+          "Occurrences"
+        ],
+        "summary": "OP-15: Consultar ocurrencias",
+        "description": "Lista registros de presencia separados de interacciones ecologicas, preservando incertidumbre y procedencia.",
+        "operationId": "list_occurrences_api_v1_occurrences_get",
+        "parameters": [
+          {
+            "name": "taxon_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Taxon Id"
+            }
+          },
+          {
+            "name": "locality_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Locality Id"
+            }
+          },
+          {
+            "name": "source_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "georeference_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Georeference Status"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date From"
+            }
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date To"
+            }
+          },
+          {
+            "name": "include_raw_reference",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Raw Reference"
+            }
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "occurrence_id",
+                "event_date",
+                "accepted_name"
+              ],
+              "type": "string",
+              "default": "occurrence_id",
+              "title": "Sort By"
+            }
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "default": "asc",
+              "title": "Sort Order"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Page Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OccurrenceListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/import-batches": {
+      "post": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "OP-09: Registrar lote de importacion con preservacion cruda inmutable",
+        "description": "Exclusivo CURATOR. Crea source_version, import_batch y raw_source_record sin autopublicar.",
+        "operationId": "register_import_batch_api_v1_admin_import_batches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportBatchCreateRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchDetailResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/import-batches/{import_batch_id}": {
+      "get": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "Consultar detalle de lote de importacion y sus registros",
+        "operationId": "get_import_batch_detail_api_v1_admin_import_batches__import_batch_id__get",
+        "parameters": [
+          {
+            "name": "import_batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Import Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBatchDetailResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/import-records": {
+      "get": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "Listar registros importados filtrables para revision y normalizacion (p. ej. UNRESOLVED)",
+        "operationId": "list_import_records_api_v1_admin_import_records_get",
+        "parameters": [
+          {
+            "name": "import_batch_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Import Batch Id"
+            }
+          },
+          {
+            "name": "validation_status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ImportRecordValidationStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Validation Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ImportRecordResponseSchema"
+                  },
+                  "title": "Response List Import Records Api V1 Admin Import Records Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/import-records/{import_record_id}/normalize": {
+      "patch": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "OP-10: Validar y normalizar registro importado",
+        "description": "Exclusivo CURATOR. Registra nombre original, taxón canonico, ID externo, regla y estado sin mutar raw_payload.",
+        "operationId": "normalize_import_record_api_v1_admin_import_records__import_record_id__normalize_patch",
+        "parameters": [
+          {
+            "name": "import_record_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Import Record Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NormalizeImportRecordRequestSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NormalizeImportRecordResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/assertions": {
+      "post": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "OP-11: Crear afirmacion de interaccion con evidencia explicita",
+        "description": "Exclusivo CURATOR. Crea afirmacion en DRAFT o IN_REVIEW respetando RD-01..RD-06.",
+        "operationId": "create_assertion_api_v1_admin_assertions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAssertionRequestSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAssertionResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/assertions/{assertion_id}": {
+      "get": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "Consultar detalle administrativo de una afirmacion en cualquier estado",
+        "operationId": "get_admin_assertion_detail_api_v1_admin_assertions__assertion_id__get",
+        "parameters": [
+          {
+            "name": "assertion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assertion Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAssertionResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/assertions/{assertion_id}/submit": {
+      "post": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "OP-11/OP-12: Preparar y enviar afirmacion DRAFT a revision (IN_REVIEW)",
+        "description": "Exclusivo CURATOR. Transiciona DRAFT -> IN_REVIEW sin publicar ni proyectar en Neo4j.",
+        "operationId": "submit_assertion_for_review_api_v1_admin_assertions__assertion_id__submit_post",
+        "parameters": [
+          {
+            "name": "assertion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assertion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitAssertionRequestSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewAssertionResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/assertions/{assertion_id}/review": {
+      "post": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "OP-12: Aprobar, rechazar, retirar o reabrir afirmacion (Outbox ACID)",
+        "description": "Exclusivo REVIEWER. En aprobacion o retiro desde PUBLISHED inserta outbox_event en la misma transaccion ACID.",
+        "operationId": "review_assertion_api_v1_admin_assertions__assertion_id__review_post",
+        "parameters": [
+          {
+            "name": "assertion_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Assertion Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewAssertionRequestSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewAssertionResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/taxa/{taxon_id}/dossier": {
+      "put": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "OP-13: Actualizar ficha documental versionada de un taxon",
+        "description": "Exclusivo CURATOR. Archiva la version previa en taxon_dossier_versions, incrementa version y registra auditoria.",
+        "operationId": "update_taxon_dossier_api_v1_admin_taxa__taxon_id__dossier_put",
+        "parameters": [
+          {
+            "name": "taxon_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Taxon Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaxonDossierRequestSchema"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateTaxonDossierResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/provenance/{entity_type}/{entity_id}": {
+      "get": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "OP-14: Consultar historial completo de procedencia y auditoria",
+        "description": "Accesible para CURATOR y REVIEWER. Reconstruye fuentes, lotes, revisiones, outbox y versiones documentales.",
+        "operationId": "get_provenance_history_api_v1_admin_provenance__entity_type___entity_id__get",
+        "parameters": [
+          {
+            "name": "entity_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "assertion",
+                "taxon",
+                "import_batch",
+                "import_record"
+              ],
+              "type": "string",
+              "title": "Entity Type"
+            }
+          },
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Entity Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvenanceHistoryResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/reconcile": {
+      "post": {
+        "tags": [
+          "Administration & Curation"
+        ],
+        "summary": "Reconciliar proyecciones Neo4j y versiones documentales MongoDB desde PostgreSQL",
+        "description": "Exclusivo REVIEWER o ADMIN. Reencola eventos fallidos del Outbox y sincroniza estado faltante o huerfano.",
+        "operationId": "reconcile_multi_model_state_api_v1_admin_reconcile_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconciliationResponseSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Autenticacion requerida o sesion expirada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permisos RBAC insuficientes para el rol activo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Violacion de regla cientifica o conflicto optimista de version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Motor de persistencia temporalmente inaccesible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          },
+          {
+            "SessionCookieAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminAssertionResponseSchema": {
+        "properties": {
+          "assertion_id": {
+            "type": "string",
+            "title": "Assertion Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "aggregate_version": {
+            "type": "integer",
+            "title": "Aggregate Version"
+          },
+          "projection_status": {
+            "type": "string",
+            "title": "Projection Status"
+          },
+          "last_projected_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Projected At"
+          },
+          "interaction_type_code": {
+            "type": "string",
+            "title": "Interaction Type Code"
+          },
+          "actor_taxon": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Actor Taxon"
+          },
+          "target_taxon": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Target Taxon"
+          },
+          "locality": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Locality"
+          },
+          "period_start": {
+            "type": "string",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "title": "Period End"
+          },
+          "season_label": {
+            "type": "string",
+            "title": "Season Label"
+          },
+          "method_code": {
+            "type": "string",
+            "title": "Method Code"
+          },
+          "assertion_scope": {
+            "type": "string",
+            "title": "Assertion Scope"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "reviewed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          },
+          "evidences": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidences"
+          },
+          "graph_projected": {
+            "type": "boolean",
+            "title": "Graph Projected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assertion_id",
+          "status",
+          "aggregate_version",
+          "projection_status",
+          "interaction_type_code",
+          "actor_taxon",
+          "target_taxon",
+          "locality",
+          "period_start",
+          "period_end",
+          "season_label",
+          "method_code",
+          "assertion_scope",
+          "created_by",
+          "created_at",
+          "updated_at",
+          "evidences",
+          "graph_projected"
+        ],
+        "title": "AdminAssertionResponseSchema"
+      },
+      "AssertionEvidenceInputSchema": {
+        "properties": {
+          "evidence_role": {
+            "type": "string",
+            "enum": [
+              "PRIMARY",
+              "SUPPORTING",
+              "CONTEXTUAL"
+            ],
+            "title": "Evidence Role",
+            "default": "PRIMARY"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "source_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Version Id"
+          },
+          "source_locator": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Locator"
+          },
+          "evidence_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "method_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvidenceMethodCode"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reported_term": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Term"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "interpretation_limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interpretation Limit"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "license_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Id"
+          }
+        },
+        "type": "object",
+        "title": "AssertionEvidenceInputSchema"
+      },
+      "AuditLogEntrySchema": {
+        "properties": {
+          "audit_id": {
+            "type": "integer",
+            "title": "Audit Id"
+          },
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "performed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Performed By"
+          },
+          "performed_at": {
+            "type": "string",
+            "title": "Performed At"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audit_id",
+          "entity_type",
+          "entity_id",
+          "action",
+          "performed_at",
+          "details"
+        ],
+        "title": "AuditLogEntrySchema"
+      },
+      "AuthSessionResponseSchema": {
+        "properties": {
+          "token_type": {
+            "type": "string",
+            "const": "Bearer",
+            "title": "Token Type",
+            "default": "Bearer"
+          },
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthenticatedUserSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_at",
+          "user"
+        ],
+        "title": "AuthSessionResponseSchema"
+      },
+      "AuthenticatedUserSchema": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "email",
+          "display_name",
+          "roles",
+          "is_active"
+        ],
+        "title": "AuthenticatedUserSchema"
+      },
+      "ConnectivityResponse": {
+        "properties": {
+          "taxon": {
+            "$ref": "#/components/schemas/TaxonSummarySchema"
+          },
+          "distinct_partner_taxa_count": {
+            "type": "integer",
+            "title": "Distinct Partner Taxa Count"
+          },
+          "documented_assertions_count": {
+            "type": "integer",
+            "title": "Documented Assertions Count"
+          },
+          "as_actor_distinct_partners": {
+            "type": "integer",
+            "title": "As Actor Distinct Partners"
+          },
+          "as_target_distinct_partners": {
+            "type": "integer",
+            "title": "As Target Distinct Partners"
+          },
+          "partners": {
+            "items": {
+              "$ref": "#/components/schemas/PartnerConnectivitySchema"
+            },
+            "type": "array",
+            "title": "Partners"
+          },
+          "applied_filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Applied Filters"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "taxon",
+          "distinct_partner_taxa_count",
+          "documented_assertions_count",
+          "as_actor_distinct_partners",
+          "as_target_distinct_partners",
+          "partners",
+          "applied_filters",
+          "warnings"
+        ],
+        "title": "ConnectivityResponse"
+      },
+      "ConsolidatedHealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded"
+            ],
+            "title": "Status"
+          },
+          "live": {
+            "type": "boolean",
+            "title": "Live"
+          },
+          "ready": {
+            "type": "boolean",
+            "title": "Ready"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "uptime_seconds": {
+            "type": "number",
+            "title": "Uptime Seconds"
+          },
+          "timestamp_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp Utc"
+          },
+          "memory_budget_mb": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Memory Budget Mb"
+          },
+          "dependencies": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EngineHealthSchema"
+            },
+            "type": "object",
+            "title": "Dependencies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "live",
+          "ready",
+          "service",
+          "version",
+          "environment",
+          "uptime_seconds",
+          "timestamp_utc",
+          "memory_budget_mb",
+          "dependencies"
+        ],
+        "title": "ConsolidatedHealthResponse"
+      },
+      "CreateAssertionRequestSchema": {
+        "properties": {
+          "actor_taxon_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Actor Taxon Id"
+          },
+          "target_taxon_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Target Taxon Id"
+          },
+          "interaction_type_code": {
+            "$ref": "#/components/schemas/InteractionTypeCode"
+          },
+          "locality_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Locality Id"
+          },
+          "period_start": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 4,
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 4,
+            "title": "Period End"
+          },
+          "season_label": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Season Label"
+          },
+          "method_code": {
+            "$ref": "#/components/schemas/EvidenceMethodCode"
+          },
+          "assertion_scope": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Assertion Scope",
+            "default": "BIOLINK_V1"
+          },
+          "initial_status": {
+            "type": "string",
+            "enum": [
+              "DRAFT",
+              "IN_REVIEW"
+            ],
+            "title": "Initial Status",
+            "default": "DRAFT"
+          },
+          "evidences": {
+            "items": {
+              "$ref": "#/components/schemas/AssertionEvidenceInputSchema"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Evidences"
+          },
+          "submission_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actor_taxon_id",
+          "target_taxon_id",
+          "interaction_type_code",
+          "locality_id",
+          "period_start",
+          "period_end",
+          "season_label",
+          "method_code",
+          "evidences"
+        ],
+        "title": "CreateAssertionRequestSchema"
+      },
+      "DossierClaimInputSchema": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Claim Id"
+          },
+          "field": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Field"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "source_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Source Id"
+          },
+          "source_locator": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Source Locator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_id",
+          "field",
+          "value",
+          "source_id",
+          "source_locator"
+        ],
+        "title": "DossierClaimInputSchema"
+      },
+      "DossierMediaInputSchema": {
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Media Id"
+          },
+          "media_type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "audio",
+              "video",
+              "document"
+            ],
+            "title": "Media Type"
+          },
+          "uri": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Uri"
+          },
+          "license": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "License"
+          },
+          "attribution": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Attribution"
+          },
+          "source_ref": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Source Ref"
+          },
+          "checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "media_id",
+          "media_type",
+          "uri",
+          "license",
+          "attribution",
+          "source_ref"
+        ],
+        "title": "DossierMediaInputSchema"
+      },
+      "EngineHealthSchema": {
+        "properties": {
+          "healthy": {
+            "type": "boolean",
+            "title": "Healthy"
+          },
+          "latency_ms": {
+            "type": "number",
+            "title": "Latency Ms"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "healthy",
+          "latency_ms"
+        ],
+        "title": "EngineHealthSchema"
+      },
+      "EvidenceDetailSchema": {
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "title": "Evidence Id"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "source_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Version Id"
+          },
+          "source_locator": {
+            "type": "string",
+            "title": "Source Locator"
+          },
+          "evidence_kind": {
+            "type": "string",
+            "title": "Evidence Kind"
+          },
+          "method_code": {
+            "type": "string",
+            "title": "Method Code"
+          },
+          "reported_term": {
+            "type": "string",
+            "title": "Reported Term"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "interpretation_limit": {
+            "type": "string",
+            "title": "Interpretation Limit"
+          },
+          "period_start": {
+            "type": "string",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "title": "Period End"
+          },
+          "license_id": {
+            "type": "string",
+            "title": "License Id"
+          },
+          "evidence_role": {
+            "type": "string",
+            "title": "Evidence Role"
+          },
+          "review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Note"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceSummarySchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "source_id",
+          "source_locator",
+          "evidence_kind",
+          "method_code",
+          "reported_term",
+          "summary",
+          "interpretation_limit",
+          "period_start",
+          "period_end",
+          "license_id",
+          "evidence_role",
+          "source"
+        ],
+        "title": "EvidenceDetailSchema"
+      },
+      "EvidenceKind": {
+        "type": "string",
+        "enum": [
+          "SPECIMEN_SAMPLE",
+          "OBSERVATION",
+          "RECORDING",
+          "DATASET_ENTRY",
+          "LITERATURE_CITATION"
+        ],
+        "title": "EvidenceKind"
+      },
+      "EvidenceMethodCode": {
+        "type": "string",
+        "enum": [
+          "FECAL_SEED_IDENTIFICATION",
+          "CAMERA_TRAP",
+          "FIELD_OBSERVATION",
+          "DATASET_RECORD",
+          "LITERATURE_REPORT",
+          "OTHER_REVIEWED"
+        ],
+        "title": "EvidenceMethodCode"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "ImportBatchCreateRequestSchema": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Source Id"
+          },
+          "provider_version": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Provider Version"
+          },
+          "endpoint_or_file": {
+            "type": "string",
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Endpoint Or File"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "query_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Query Parameters"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRecordCreateSchema"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Records"
+          },
+          "license_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License Id"
+          },
+          "release_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Date"
+          },
+          "auto_publish": {
+            "type": "boolean",
+            "title": "Auto Publish",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "provider_version",
+          "endpoint_or_file",
+          "provider",
+          "records"
+        ],
+        "title": "ImportBatchCreateRequestSchema"
+      },
+      "ImportBatchDetailResponseSchema": {
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/ImportBatchResponseSchema"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRecordResponseSchema"
+            },
+            "type": "array",
+            "title": "Records"
+          }
+        },
+        "type": "object",
+        "required": [
+          "batch",
+          "records"
+        ],
+        "title": "ImportBatchDetailResponseSchema"
+      },
+      "ImportBatchResponseSchema": {
+        "properties": {
+          "import_batch_id": {
+            "type": "string",
+            "title": "Import Batch Id"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "source_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Version Id"
+          },
+          "provider_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Version"
+          },
+          "endpoint_or_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint Or File"
+          },
+          "started_by": {
+            "type": "string",
+            "title": "Started By"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "query_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Query Parameters"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "received_count": {
+            "type": "integer",
+            "title": "Received Count"
+          },
+          "accepted_count": {
+            "type": "integer",
+            "title": "Accepted Count"
+          },
+          "rejected_count": {
+            "type": "integer",
+            "title": "Rejected Count"
+          },
+          "pending_count": {
+            "type": "integer",
+            "title": "Pending Count"
+          },
+          "unresolved_count": {
+            "type": "integer",
+            "title": "Unresolved Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "import_batch_id",
+          "source_id",
+          "started_by",
+          "started_at",
+          "query_parameters",
+          "filters",
+          "status",
+          "received_count",
+          "accepted_count",
+          "rejected_count",
+          "pending_count",
+          "unresolved_count"
+        ],
+        "title": "ImportBatchResponseSchema"
+      },
+      "ImportRecordCreateSchema": {
+        "properties": {
+          "external_record_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "External Record Id"
+          },
+          "raw_payload": {
+            "additionalProperties": true,
+            "type": "object",
+            "minProperties": 1,
+            "title": "Raw Payload"
+          },
+          "verbatim_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verbatim Name"
+          },
+          "proposed_external_scheme": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaxonIdentifierScheme"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proposed_external_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed External Id"
+          },
+          "redistribution_permitted": {
+            "type": "boolean",
+            "title": "Redistribution Permitted",
+            "default": false
+          },
+          "full_text_stored": {
+            "type": "boolean",
+            "title": "Full Text Stored",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "external_record_id",
+          "raw_payload"
+        ],
+        "title": "ImportRecordCreateSchema"
+      },
+      "ImportRecordResponseSchema": {
+        "properties": {
+          "import_record_id": {
+            "type": "string",
+            "title": "Import Record Id"
+          },
+          "import_batch_id": {
+            "type": "string",
+            "title": "Import Batch Id"
+          },
+          "external_record_id": {
+            "type": "string",
+            "title": "External Record Id"
+          },
+          "raw_document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Document Id"
+          },
+          "validation_status": {
+            "type": "string",
+            "title": "Validation Status"
+          },
+          "canonical_taxon_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Taxon Id"
+          },
+          "canonical_accepted_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Accepted Name"
+          },
+          "verbatim_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verbatim Name"
+          },
+          "proposed_external_scheme": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed External Scheme"
+          },
+          "proposed_external_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed External Id"
+          },
+          "matching_rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matching Rule"
+          },
+          "validation_notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Notes"
+          },
+          "normalized_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalized By"
+          },
+          "normalized_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalized At"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "import_record_id",
+          "import_batch_id",
+          "external_record_id",
+          "validation_status",
+          "created_at"
+        ],
+        "title": "ImportRecordResponseSchema"
+      },
+      "ImportRecordValidationStatus": {
+        "type": "string",
+        "enum": [
+          "PENDING",
+          "VALID",
+          "INVALID",
+          "UNRESOLVED",
+          "DUPLICATE"
+        ],
+        "title": "ImportRecordValidationStatus"
+      },
+      "InteractionDetailResponse": {
+        "properties": {
+          "assertion": {
+            "$ref": "#/components/schemas/InteractionListItemSchema"
+          },
+          "evidences": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceDetailSchema"
+            },
+            "type": "array",
+            "title": "Evidences"
+          },
+          "study_dossiers": {
+            "items": {
+              "$ref": "#/components/schemas/StudyDossierSchema"
+            },
+            "type": "array",
+            "title": "Study Dossiers"
+          },
+          "raw_source_references": {
+            "items": {
+              "$ref": "#/components/schemas/RawSourceReferenceSchema"
+            },
+            "type": "array",
+            "title": "Raw Source References"
+          },
+          "graph_projected": {
+            "type": "boolean",
+            "title": "Graph Projected"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assertion",
+          "evidences",
+          "study_dossiers",
+          "raw_source_references",
+          "graph_projected",
+          "warnings"
+        ],
+        "title": "InteractionDetailResponse"
+      },
+      "InteractionListItemSchema": {
+        "properties": {
+          "assertion_id": {
+            "type": "string",
+            "title": "Assertion Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "interaction_type_code": {
+            "type": "string",
+            "title": "Interaction Type Code"
+          },
+          "actor_taxon": {
+            "$ref": "#/components/schemas/TaxonSummarySchema"
+          },
+          "target_taxon": {
+            "$ref": "#/components/schemas/TaxonSummarySchema"
+          },
+          "locality": {
+            "$ref": "#/components/schemas/LocalitySummarySchema"
+          },
+          "period_start": {
+            "type": "string",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "title": "Period End"
+          },
+          "season_label": {
+            "type": "string",
+            "title": "Season Label"
+          },
+          "method_code": {
+            "type": "string",
+            "title": "Method Code"
+          },
+          "assertion_scope": {
+            "type": "string",
+            "title": "Assertion Scope"
+          },
+          "source_citations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Citations"
+          },
+          "source_locators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Locators"
+          },
+          "interpretation_limits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interpretation Limits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assertion_id",
+          "status",
+          "interaction_type_code",
+          "actor_taxon",
+          "target_taxon",
+          "locality",
+          "period_start",
+          "period_end",
+          "season_label",
+          "method_code",
+          "assertion_scope",
+          "source_citations",
+          "source_locators",
+          "interpretation_limits"
+        ],
+        "title": "InteractionListItemSchema"
+      },
+      "InteractionTypeCode": {
+        "type": "string",
+        "enum": [
+          "CONSUMES_FRUIT_OF",
+          "REMOVES_FRUIT_OF",
+          "CONSUMES_OR_REMOVES_FRUIT_OF",
+          "DISPERSES_SEEDS_OF"
+        ],
+        "title": "InteractionTypeCode"
+      },
+      "LivenessResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "alive",
+            "title": "Status"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "uptime_seconds": {
+            "type": "number",
+            "title": "Uptime Seconds"
+          },
+          "timestamp_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp Utc"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "service",
+          "version",
+          "environment",
+          "uptime_seconds",
+          "timestamp_utc"
+        ],
+        "title": "LivenessResponse"
+      },
+      "LocalityComparisonResponse": {
+        "properties": {
+          "locality_a": {
+            "$ref": "#/components/schemas/LocalityNetworkMetricsSchema"
+          },
+          "locality_b": {
+            "$ref": "#/components/schemas/LocalityNetworkMetricsSchema"
+          },
+          "shared_taxa": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonSummarySchema"
+            },
+            "type": "array",
+            "title": "Shared Taxa"
+          },
+          "exclusive_to_a_taxa": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonSummarySchema"
+            },
+            "type": "array",
+            "title": "Exclusive To A Taxa"
+          },
+          "exclusive_to_b_taxa": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonSummarySchema"
+            },
+            "type": "array",
+            "title": "Exclusive To B Taxa"
+          },
+          "shared_interaction_pairs": {
+            "items": {
+              "$ref": "#/components/schemas/SharedInteractionPairSchema"
+            },
+            "type": "array",
+            "title": "Shared Interaction Pairs"
+          },
+          "undetermined_locality_assertions_count": {
+            "type": "integer",
+            "title": "Undetermined Locality Assertions Count"
+          },
+          "applied_filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Applied Filters"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "locality_a",
+          "locality_b",
+          "shared_taxa",
+          "exclusive_to_a_taxa",
+          "exclusive_to_b_taxa",
+          "shared_interaction_pairs",
+          "undetermined_locality_assertions_count",
+          "applied_filters",
+          "warnings"
+        ],
+        "title": "LocalityComparisonResponse"
+      },
+      "LocalityNetworkMetricsSchema": {
+        "properties": {
+          "locality": {
+            "$ref": "#/components/schemas/LocalitySummarySchema"
+          },
+          "published_assertions_count": {
+            "type": "integer",
+            "title": "Published Assertions Count"
+          },
+          "distinct_taxa_count": {
+            "type": "integer",
+            "title": "Distinct Taxa Count"
+          },
+          "distinct_animal_taxa_count": {
+            "type": "integer",
+            "title": "Distinct Animal Taxa Count"
+          },
+          "distinct_plant_taxa_count": {
+            "type": "integer",
+            "title": "Distinct Plant Taxa Count"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "locality",
+          "published_assertions_count",
+          "distinct_taxa_count",
+          "distinct_animal_taxa_count",
+          "distinct_plant_taxa_count",
+          "source_ids"
+        ],
+        "title": "LocalityNetworkMetricsSchema"
+      },
+      "LocalitySummarySchema": {
+        "properties": {
+          "locality_id": {
+            "type": "string",
+            "title": "Locality Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "locality_type": {
+            "type": "string",
+            "title": "Locality Type"
+          },
+          "protected_status": {
+            "type": "string",
+            "title": "Protected Status"
+          },
+          "spatial_validation_status": {
+            "type": "string",
+            "title": "Spatial Validation Status"
+          },
+          "coordinate_precision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinate Precision"
+          },
+          "parent_locality_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Locality Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "locality_id",
+          "name",
+          "locality_type",
+          "protected_status",
+          "spatial_validation_status"
+        ],
+        "title": "LocalitySummarySchema"
+      },
+      "LoginRequestSchema": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 4,
+            "title": "Email"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 8,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "title": "LoginRequestSchema"
+      },
+      "LogoutResponseSchema": {
+        "properties": {
+          "revoked": {
+            "type": "boolean",
+            "title": "Revoked"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "revoked",
+          "message"
+        ],
+        "title": "LogoutResponseSchema"
+      },
+      "NormalizeImportRecordRequestSchema": {
+        "properties": {
+          "validation_status": {
+            "type": "string",
+            "enum": [
+              "VALID",
+              "INVALID",
+              "UNRESOLVED",
+              "DUPLICATE"
+            ],
+            "title": "Validation Status"
+          },
+          "matching_rule": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 2,
+            "title": "Matching Rule"
+          },
+          "canonical_taxon_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Taxon Id"
+          },
+          "verbatim_name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verbatim Name"
+          },
+          "external_scheme": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaxonIdentifierScheme"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "external_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Id"
+          },
+          "validation_notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validation Notes"
+          },
+          "register_name_variant": {
+            "type": "boolean",
+            "title": "Register Name Variant",
+            "default": true
+          },
+          "register_external_identifier": {
+            "type": "boolean",
+            "title": "Register External Identifier",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "validation_status",
+          "matching_rule"
+        ],
+        "title": "NormalizeImportRecordRequestSchema"
+      },
+      "NormalizeImportRecordResponseSchema": {
+        "properties": {
+          "record": {
+            "$ref": "#/components/schemas/ImportRecordResponseSchema"
+          },
+          "batch": {
+            "$ref": "#/components/schemas/ImportBatchResponseSchema"
+          },
+          "registered_name_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registered Name Id"
+          },
+          "registered_identifier_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Registered Identifier Id"
+          },
+          "raw_document_updated": {
+            "type": "boolean",
+            "title": "Raw Document Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "record",
+          "batch",
+          "raw_document_updated"
+        ],
+        "title": "NormalizeImportRecordResponseSchema"
+      },
+      "OccurrenceItemSchema": {
+        "properties": {
+          "occurrence_id": {
+            "type": "string",
+            "title": "Occurrence Id"
+          },
+          "taxon": {
+            "$ref": "#/components/schemas/TaxonSummarySchema"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceSummarySchema"
+          },
+          "locality": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LocalitySummarySchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_record_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Record Id"
+          },
+          "event_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Date"
+          },
+          "latitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latitude"
+          },
+          "longitude": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Longitude"
+          },
+          "coordinate_uncertainty_meters": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coordinate Uncertainty Meters"
+          },
+          "basis_of_record": {
+            "type": "string",
+            "title": "Basis Of Record"
+          },
+          "georeference_status": {
+            "type": "string",
+            "title": "Georeference Status"
+          },
+          "is_interaction_evidence": {
+            "type": "boolean",
+            "title": "Is Interaction Evidence"
+          },
+          "raw_source_reference": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RawSourceReferenceSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "occurrence_id",
+          "taxon",
+          "source",
+          "basis_of_record",
+          "georeference_status",
+          "is_interaction_evidence"
+        ],
+        "title": "OccurrenceItemSchema"
+      },
+      "OccurrenceListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OccurrenceItemSchema"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "applied_filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Applied Filters"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "pagination",
+          "applied_filters",
+          "warnings"
+        ],
+        "title": "OccurrenceListResponse"
+      },
+      "OutboxEventSchema": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "event_type": {
+            "type": "string",
+            "title": "Event Type"
+          },
+          "assertion_id": {
+            "type": "string",
+            "title": "Assertion Id"
+          },
+          "aggregate_version": {
+            "type": "integer",
+            "title": "Aggregate Version"
+          },
+          "payload_version": {
+            "type": "integer",
+            "title": "Payload Version"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "processing_status": {
+            "type": "string",
+            "title": "Processing Status"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "last_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error"
+          },
+          "processed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Processed At"
+          },
+          "payload_json": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Payload Json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "event_type",
+          "assertion_id",
+          "aggregate_version",
+          "payload_version",
+          "created_at",
+          "processing_status",
+          "attempts"
+        ],
+        "title": "OutboxEventSchema"
+      },
+      "PaginationMeta": {
+        "properties": {
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "total_pages": {
+            "type": "integer",
+            "title": "Total Pages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "page",
+          "page_size",
+          "total",
+          "total_pages"
+        ],
+        "title": "PaginationMeta"
+      },
+      "PartnerConnectivitySchema": {
+        "properties": {
+          "taxon": {
+            "$ref": "#/components/schemas/TaxonSummarySchema"
+          },
+          "role_of_partner": {
+            "type": "string",
+            "title": "Role Of Partner"
+          },
+          "assertions_count": {
+            "type": "integer",
+            "title": "Assertions Count"
+          },
+          "interaction_type_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interaction Type Codes"
+          },
+          "locality_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locality Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "taxon",
+          "role_of_partner",
+          "assertions_count",
+          "interaction_type_codes",
+          "locality_ids"
+        ],
+        "title": "PartnerConnectivitySchema"
+      },
+      "ProvenanceHistoryResponseSchema": {
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "title": "Entity Type"
+          },
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          },
+          "current_state": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Current State"
+          },
+          "sources": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "source_versions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Source Versions"
+          },
+          "import_batches": {
+            "items": {
+              "$ref": "#/components/schemas/ImportBatchResponseSchema"
+            },
+            "type": "array",
+            "title": "Import Batches"
+          },
+          "import_records": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRecordResponseSchema"
+            },
+            "type": "array",
+            "title": "Import Records"
+          },
+          "evidences": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evidences"
+          },
+          "review_events": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewEventSchema"
+            },
+            "type": "array",
+            "title": "Review Events"
+          },
+          "outbox_events": {
+            "items": {
+              "$ref": "#/components/schemas/OutboxEventSchema"
+            },
+            "type": "array",
+            "title": "Outbox Events"
+          },
+          "dossier_versions": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonDossierVersionSchema"
+            },
+            "type": "array",
+            "title": "Dossier Versions"
+          },
+          "audit_logs": {
+            "items": {
+              "$ref": "#/components/schemas/AuditLogEntrySchema"
+            },
+            "type": "array",
+            "title": "Audit Logs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_type",
+          "entity_id",
+          "current_state",
+          "sources",
+          "source_versions",
+          "import_batches",
+          "import_records",
+          "evidences",
+          "review_events",
+          "outbox_events",
+          "dossier_versions",
+          "audit_logs"
+        ],
+        "title": "ProvenanceHistoryResponseSchema"
+      },
+      "RawSourceReferenceSchema": {
+        "properties": {
+          "raw_document_id": {
+            "type": "string",
+            "title": "Raw Document Id"
+          },
+          "import_batch_id": {
+            "type": "string",
+            "title": "Import Batch Id"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "external_record_id": {
+            "type": "string",
+            "title": "External Record Id"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "checksum": {
+            "type": "string",
+            "title": "Checksum"
+          },
+          "license_id": {
+            "type": "string",
+            "title": "License Id"
+          },
+          "redistribution_permitted": {
+            "type": "boolean",
+            "title": "Redistribution Permitted"
+          },
+          "raw_payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw Payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "raw_document_id",
+          "import_batch_id",
+          "source_id",
+          "external_record_id",
+          "provider",
+          "checksum",
+          "license_id",
+          "redistribution_permitted"
+        ],
+        "title": "RawSourceReferenceSchema"
+      },
+      "ReadinessResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "not_ready"
+            ],
+            "title": "Status"
+          },
+          "ready": {
+            "type": "boolean",
+            "title": "Ready"
+          },
+          "timestamp_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp Utc"
+          },
+          "dependencies": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/EngineHealthSchema"
+            },
+            "type": "object",
+            "title": "Dependencies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "ready",
+          "timestamp_utc",
+          "dependencies"
+        ],
+        "title": "ReadinessResponse"
+      },
+      "ReconciliationResponseSchema": {
+        "properties": {
+          "outbox_processed_count": {
+            "type": "integer",
+            "title": "Outbox Processed Count"
+          },
+          "outbox_failed_count": {
+            "type": "integer",
+            "title": "Outbox Failed Count"
+          },
+          "graph_expected_published_count": {
+            "type": "integer",
+            "title": "Graph Expected Published Count"
+          },
+          "graph_projected_or_verified_count": {
+            "type": "integer",
+            "title": "Graph Projected Or Verified Count"
+          },
+          "graph_removed_stale_count": {
+            "type": "integer",
+            "title": "Graph Removed Stale Count"
+          },
+          "dossier_checked_taxa_count": {
+            "type": "integer",
+            "title": "Dossier Checked Taxa Count"
+          },
+          "dossier_reconciled_count": {
+            "type": "integer",
+            "title": "Dossier Reconciled Count"
+          },
+          "reconciled_taxon_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reconciled Taxon Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outbox_processed_count",
+          "outbox_failed_count",
+          "graph_expected_published_count",
+          "graph_projected_or_verified_count",
+          "graph_removed_stale_count",
+          "dossier_checked_taxa_count",
+          "dossier_reconciled_count",
+          "reconciled_taxon_ids"
+        ],
+        "title": "ReconciliationResponseSchema"
+      },
+      "ReviewAssertionRequestSchema": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "REJECT",
+              "WITHDRAW",
+              "REOPEN"
+            ],
+            "title": "Action"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 3,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "reason"
+        ],
+        "title": "ReviewAssertionRequestSchema"
+      },
+      "ReviewAssertionResponseSchema": {
+        "properties": {
+          "assertion": {
+            "$ref": "#/components/schemas/AdminAssertionResponseSchema"
+          },
+          "review_event": {
+            "$ref": "#/components/schemas/ReviewEventSchema"
+          },
+          "outbox_event": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutboxEventSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "relational_committed": {
+            "type": "boolean",
+            "title": "Relational Committed"
+          },
+          "graph_sync_note": {
+            "type": "string",
+            "title": "Graph Sync Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assertion",
+          "review_event",
+          "relational_committed",
+          "graph_sync_note"
+        ],
+        "title": "ReviewAssertionResponseSchema"
+      },
+      "ReviewEventSchema": {
+        "properties": {
+          "review_event_id": {
+            "type": "string",
+            "title": "Review Event Id"
+          },
+          "assertion_id": {
+            "type": "string",
+            "title": "Assertion Id"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "previous_status": {
+            "type": "string",
+            "title": "Previous Status"
+          },
+          "new_status": {
+            "type": "string",
+            "title": "New Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "review_event_id",
+          "assertion_id",
+          "user_id",
+          "previous_status",
+          "new_status",
+          "reason",
+          "created_at"
+        ],
+        "title": "ReviewEventSchema"
+      },
+      "SharedInteractionPairSchema": {
+        "properties": {
+          "actor_taxon_id": {
+            "type": "string",
+            "title": "Actor Taxon Id"
+          },
+          "actor_name": {
+            "type": "string",
+            "title": "Actor Name"
+          },
+          "target_taxon_id": {
+            "type": "string",
+            "title": "Target Taxon Id"
+          },
+          "target_name": {
+            "type": "string",
+            "title": "Target Name"
+          },
+          "interaction_type_code": {
+            "type": "string",
+            "title": "Interaction Type Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "actor_taxon_id",
+          "actor_name",
+          "target_taxon_id",
+          "target_name",
+          "interaction_type_code"
+        ],
+        "title": "SharedInteractionPairSchema"
+      },
+      "SourceDetailResponse": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/SourceSummarySchema"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/SourceVersionSchema"
+            },
+            "type": "array",
+            "title": "Versions"
+          },
+          "published_assertions_count": {
+            "type": "integer",
+            "title": "Published Assertions Count"
+          },
+          "evidences_count": {
+            "type": "integer",
+            "title": "Evidences Count"
+          },
+          "has_study_dossier": {
+            "type": "boolean",
+            "title": "Has Study Dossier"
+          },
+          "study_dossier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StudyDossierSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "versions",
+          "published_assertions_count",
+          "evidences_count",
+          "has_study_dossier",
+          "warnings"
+        ],
+        "title": "SourceDetailResponse"
+      },
+      "SourceSummarySchema": {
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "source_type": {
+            "type": "string",
+            "title": "Source Type"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "authors": {
+            "type": "string",
+            "title": "Authors"
+          },
+          "publication_year": {
+            "type": "integer",
+            "title": "Publication Year"
+          },
+          "citation_text": {
+            "type": "string",
+            "title": "Citation Text"
+          },
+          "license_id": {
+            "type": "string",
+            "title": "License Id"
+          },
+          "doi": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi"
+          },
+          "uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uri"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "source_type",
+          "title",
+          "authors",
+          "publication_year",
+          "citation_text",
+          "license_id"
+        ],
+        "title": "SourceSummarySchema"
+      },
+      "SourceVersionSchema": {
+        "properties": {
+          "source_version_id": {
+            "type": "string",
+            "title": "Source Version Id"
+          },
+          "provider_version": {
+            "type": "string",
+            "title": "Provider Version"
+          },
+          "release_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Date"
+          },
+          "retrieved_at": {
+            "type": "string",
+            "title": "Retrieved At"
+          },
+          "endpoint_or_file": {
+            "type": "string",
+            "title": "Endpoint Or File"
+          },
+          "query_parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Query Parameters"
+          },
+          "filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Filters"
+          },
+          "license_id": {
+            "type": "string",
+            "title": "License Id"
+          },
+          "checksum": {
+            "type": "string",
+            "title": "Checksum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_version_id",
+          "provider_version",
+          "retrieved_at",
+          "endpoint_or_file",
+          "query_parameters",
+          "filters",
+          "license_id",
+          "checksum"
+        ],
+        "title": "SourceVersionSchema"
+      },
+      "StudyDossierSchema": {
+        "properties": {
+          "dossier_id": {
+            "type": "string",
+            "title": "Dossier Id"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version"
+          },
+          "doi_or_uri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Doi Or Uri"
+          },
+          "research_question": {
+            "type": "string",
+            "title": "Research Question"
+          },
+          "sampling_design": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Sampling Design"
+          },
+          "study_localities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Study Localities"
+          },
+          "study_period": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Study Period"
+          },
+          "focal_taxa": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Focal Taxa"
+          },
+          "interpretation_limits": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interpretation Limits"
+          },
+          "license_and_usage": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "License And Usage"
+          },
+          "checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dossier_id",
+          "source_id",
+          "schema_version",
+          "research_question",
+          "sampling_design",
+          "study_localities",
+          "study_period",
+          "focal_taxa",
+          "interpretation_limits",
+          "license_and_usage"
+        ],
+        "title": "StudyDossierSchema"
+      },
+      "SubgraphEdgeSchema": {
+        "properties": {
+          "assertion_id": {
+            "type": "string",
+            "title": "Assertion Id"
+          },
+          "actor_taxon_id": {
+            "type": "string",
+            "title": "Actor Taxon Id"
+          },
+          "actor_name": {
+            "type": "string",
+            "title": "Actor Name"
+          },
+          "target_taxon_id": {
+            "type": "string",
+            "title": "Target Taxon Id"
+          },
+          "target_name": {
+            "type": "string",
+            "title": "Target Name"
+          },
+          "interaction_type_code": {
+            "type": "string",
+            "title": "Interaction Type Code"
+          },
+          "locality_id": {
+            "type": "string",
+            "title": "Locality Id"
+          },
+          "locality_name": {
+            "type": "string",
+            "title": "Locality Name"
+          },
+          "protected_status": {
+            "type": "string",
+            "title": "Protected Status"
+          },
+          "period_start": {
+            "type": "string",
+            "title": "Period Start"
+          },
+          "period_end": {
+            "type": "string",
+            "title": "Period End"
+          },
+          "method_code": {
+            "type": "string",
+            "title": "Method Code"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "assertion_id",
+          "actor_taxon_id",
+          "actor_name",
+          "target_taxon_id",
+          "target_name",
+          "interaction_type_code",
+          "locality_id",
+          "locality_name",
+          "protected_status",
+          "period_start",
+          "period_end",
+          "method_code",
+          "source_ids"
+        ],
+        "title": "SubgraphEdgeSchema"
+      },
+      "SubgraphNodeSchema": {
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "title": "Node Id"
+          },
+          "node_type": {
+            "type": "string",
+            "title": "Node Type"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "properties": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Properties"
+          }
+        },
+        "type": "object",
+        "required": [
+          "node_id",
+          "node_type",
+          "label",
+          "properties"
+        ],
+        "title": "SubgraphNodeSchema"
+      },
+      "SubgraphResponse": {
+        "properties": {
+          "applied_filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Applied Filters"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/SubgraphNodeSchema"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "interactions": {
+            "items": {
+              "$ref": "#/components/schemas/SubgraphEdgeSchema"
+            },
+            "type": "array",
+            "title": "Interactions"
+          },
+          "undetermined_locality_excluded_count": {
+            "type": "integer",
+            "title": "Undetermined Locality Excluded Count"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "applied_filters",
+          "nodes",
+          "interactions",
+          "undetermined_locality_excluded_count",
+          "warnings"
+        ],
+        "title": "SubgraphResponse"
+      },
+      "SubmitAssertionRequestSchema": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "SubmitAssertionRequestSchema"
+      },
+      "TaxonDetailResponse": {
+        "properties": {
+          "taxon": {
+            "$ref": "#/components/schemas/TaxonSummarySchema"
+          },
+          "names": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonNameSchema"
+            },
+            "type": "array",
+            "title": "Names"
+          },
+          "external_identifiers": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonIdentifierSchema"
+            },
+            "type": "array",
+            "title": "External Identifiers"
+          },
+          "has_dossier": {
+            "type": "boolean",
+            "title": "Has Dossier"
+          },
+          "dossier": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaxonDossierSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "taxon",
+          "names",
+          "external_identifiers",
+          "has_dossier"
+        ],
+        "title": "TaxonDetailResponse"
+      },
+      "TaxonDossierClaimSchema": {
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "title": "Claim Id"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "value": {
+            "title": "Value"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "source_locator": {
+            "type": "string",
+            "title": "Source Locator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "claim_id",
+          "field",
+          "value",
+          "source_id",
+          "source_locator"
+        ],
+        "title": "TaxonDossierClaimSchema"
+      },
+      "TaxonDossierMediaSchema": {
+        "properties": {
+          "media_id": {
+            "type": "string",
+            "title": "Media Id"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          },
+          "uri": {
+            "type": "string",
+            "title": "Uri"
+          },
+          "license": {
+            "type": "string",
+            "title": "License"
+          },
+          "attribution": {
+            "type": "string",
+            "title": "Attribution"
+          },
+          "source_ref": {
+            "type": "string",
+            "title": "Source Ref"
+          },
+          "checksum": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checksum"
+          }
+        },
+        "type": "object",
+        "required": [
+          "media_id",
+          "media_type",
+          "uri",
+          "license",
+          "attribution",
+          "source_ref"
+        ],
+        "title": "TaxonDossierMediaSchema"
+      },
+      "TaxonDossierSchema": {
+        "properties": {
+          "taxon_id": {
+            "type": "string",
+            "title": "Taxon Id"
+          },
+          "schema_version": {
+            "type": "integer",
+            "title": "Schema Version"
+          },
+          "document_version": {
+            "type": "integer",
+            "title": "Document Version"
+          },
+          "history_versions_count": {
+            "type": "integer",
+            "title": "History Versions Count"
+          },
+          "summary_description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary Description"
+          },
+          "summary_source_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Summary Source Refs"
+          },
+          "summary_locators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Summary Locators"
+          },
+          "sections": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Sections"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonDossierClaimSchema"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonDossierMediaSchema"
+            },
+            "type": "array",
+            "title": "Media"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "taxon_id",
+          "schema_version",
+          "document_version",
+          "history_versions_count",
+          "summary_source_refs",
+          "summary_locators",
+          "sections",
+          "claims",
+          "media",
+          "updated_at"
+        ],
+        "title": "TaxonDossierSchema"
+      },
+      "TaxonDossierVersionSchema": {
+        "properties": {
+          "version_id": {
+            "type": "string",
+            "title": "Version Id"
+          },
+          "taxon_id": {
+            "type": "string",
+            "title": "Taxon Id"
+          },
+          "document_version": {
+            "type": "integer",
+            "title": "Document Version"
+          },
+          "archived_at": {
+            "type": "string",
+            "title": "Archived At"
+          },
+          "archived_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived By"
+          },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          },
+          "snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_id",
+          "taxon_id",
+          "document_version",
+          "archived_at"
+        ],
+        "title": "TaxonDossierVersionSchema"
+      },
+      "TaxonIdentifierSchema": {
+        "properties": {
+          "taxon_identifier_id": {
+            "type": "string",
+            "title": "Taxon Identifier Id"
+          },
+          "scheme": {
+            "type": "string",
+            "title": "Scheme"
+          },
+          "external_id": {
+            "type": "string",
+            "title": "External Id"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "taxon_identifier_id",
+          "scheme",
+          "external_id",
+          "source_id"
+        ],
+        "title": "TaxonIdentifierSchema"
+      },
+      "TaxonIdentifierScheme": {
+        "type": "string",
+        "enum": [
+          "GBIF",
+          "ENCICLOVIDA",
+          "NCBI",
+          "COL",
+          "IPNI",
+          "ITIS",
+          "CUSTOM"
+        ],
+        "title": "TaxonIdentifierScheme"
+      },
+      "TaxonInteractionsResponse": {
+        "properties": {
+          "taxon_id": {
+            "type": "string",
+            "title": "Taxon Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InteractionListItemSchema"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "applied_filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Applied Filters"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "taxon_id",
+          "items",
+          "pagination",
+          "applied_filters",
+          "warnings"
+        ],
+        "title": "TaxonInteractionsResponse"
+      },
+      "TaxonNameSchema": {
+        "properties": {
+          "taxon_name_id": {
+            "type": "string",
+            "title": "Taxon Name Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "name_usage": {
+            "type": "string",
+            "title": "Name Usage"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "source_id": {
+            "type": "string",
+            "title": "Source Id"
+          },
+          "is_preferred": {
+            "type": "boolean",
+            "title": "Is Preferred"
+          },
+          "verbatim_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verbatim Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "taxon_name_id",
+          "name",
+          "name_usage",
+          "language",
+          "source_id",
+          "is_preferred"
+        ],
+        "title": "TaxonNameSchema"
+      },
+      "TaxonSearchResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaxonSummarySchema"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "applied_filters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Applied Filters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "pagination"
+        ],
+        "title": "TaxonSearchResponse"
+      },
+      "TaxonSummarySchema": {
+        "properties": {
+          "taxon_id": {
+            "type": "string",
+            "title": "Taxon Id"
+          },
+          "accepted_name": {
+            "type": "string",
+            "title": "Accepted Name"
+          },
+          "scientific_authorship": {
+            "type": "string",
+            "title": "Scientific Authorship"
+          },
+          "taxonomic_rank": {
+            "type": "string",
+            "title": "Taxonomic Rank"
+          },
+          "organism_group": {
+            "type": "string",
+            "title": "Organism Group"
+          },
+          "taxonomic_status": {
+            "type": "string",
+            "title": "Taxonomic Status"
+          },
+          "matched_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Name"
+          },
+          "matched_usage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Usage"
+          },
+          "matched_verbatim_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Verbatim Name"
+          },
+          "matched_identifier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Identifier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "taxon_id",
+          "accepted_name",
+          "scientific_authorship",
+          "taxonomic_rank",
+          "organism_group",
+          "taxonomic_status"
+        ],
+        "title": "TaxonSummarySchema"
+      },
+      "UpdateTaxonDossierRequestSchema": {
+        "properties": {
+          "summary_description": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 3,
+            "title": "Summary Description"
+          },
+          "summary_source_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Summary Source Refs"
+          },
+          "summary_locators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Summary Locators"
+          },
+          "sections": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Sections"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/DossierClaimInputSchema"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "media": {
+            "items": {
+              "$ref": "#/components/schemas/DossierMediaInputSchema"
+            },
+            "type": "array",
+            "title": "Media"
+          },
+          "change_reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 3,
+            "title": "Change Reason"
+          },
+          "expected_version": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Version"
+          },
+          "dataset_tag": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Dataset Tag",
+            "default": "CURATED_BIOLINK"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary_description",
+          "summary_source_refs",
+          "change_reason"
+        ],
+        "title": "UpdateTaxonDossierRequestSchema"
+      },
+      "UpdateTaxonDossierResponseSchema": {
+        "properties": {
+          "taxon_id": {
+            "type": "string",
+            "title": "Taxon Id"
+          },
+          "previous_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Version"
+          },
+          "archived_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived Version Id"
+          },
+          "dossier": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Dossier"
+          },
+          "dossier_sync_status": {
+            "type": "string",
+            "title": "Dossier Sync Status"
+          },
+          "sync_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Warning"
+          }
+        },
+        "type": "object",
+        "required": [
+          "taxon_id",
+          "dossier",
+          "dossier_sync_status"
+        ],
+        "title": "UpdateTaxonDossierResponseSchema"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ErrorDetail": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Request Id"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorDetail",
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorDetail"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "OpaqueSessionToken",
+        "description": "Token de sesion opaco emitido por POST /api/v1/auth/login (validado por digest SHA-256 en PostgreSQL user_session)."
+      },
+      "SessionCookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "biolink_session",
+        "description": "Cookie HttpOnly de sesion administrativa (prohibido almacenar en localStorage)."
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Sondas liveness/readiness y diagnóstico del presupuesto de memoria."
+    },
+    {
+      "name": "Authentication",
+      "description": "Sesiones stateful internas con PBKDF2-HMAC-SHA256, SHA-256 y cookies HttpOnly."
+    },
+    {
+      "name": "Taxa",
+      "description": "OP-01 y OP-02: Búsqueda taxonómica, sinónimos, IDs externos y expedientes taxon_dossier."
+    },
+    {
+      "name": "Interactions",
+      "description": "OP-03 y OP-04: Afirmaciones PUBLISHED, evidencia, citas y estado de proyección en Neo4j."
+    },
+    {
+      "name": "Network",
+      "description": "OP-05, OP-06 y OP-07: Subredes filtradas, comparación de localidades y conectividad."
+    },
+    {
+      "name": "Sources",
+      "description": "OP-08: Consulta bibliográfica, versiones de dataset y expedientes study_dossier."
+    },
+    {
+      "name": "Occurrences",
+      "description": "OP-15: Registros de presencia separados de afirmaciones de interacción."
+    },
+    {
+      "name": "Administration & Curation",
+      "description": "OP-09 a OP-14 y reconciliación multi-modelo con RBAC (Curador / Revisor / Admin)."
+    }
+  ]
+}
