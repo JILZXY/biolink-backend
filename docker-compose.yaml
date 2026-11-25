@@ -125,6 +125,7 @@ services:
       MONGODB_PORT: 27017
       NEO4J_HOST: graph-db
       NEO4J_BOLT_PORT: 7687
+      BIOLINK_DATABASE_DIR: /app/database
       BACKEND_HOST: 0.0.0.0
       BACKEND_PORT: 8000
     ports:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,20 @@ from biolink_backend.repositories.graph.projection_repository import Neo4jProjec
 from biolink_backend.security.passwords import hash_password
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[3]
-_DB_DIR = _BACKEND_ROOT / "database"
+_DB_DIR = Path(
+    os.environ.get("BIOLINK_DATABASE_DIR", _BACKEND_ROOT / "database")
+).expanduser().resolve()
+
+
+def _read_db_asset(*relative_path: str) -> str:
+    asset_path = _DB_DIR.joinpath(*relative_path)
+    try:
+        return asset_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"BioLink database asset not found: {asset_path}. "
+            "Set BIOLINK_DATABASE_DIR to the database assets directory."
+        ) from exc
 
 DEFAULT_TEST_CREDENTIALS: dict[str, str] = {
     "USR_SYSTEM": "AdminBioLink2026!",
@@ -33,12 +47,10 @@ def _get_seed_password_hashes() -> dict[str, str]:
 def apply_reference_fixture(manager: DatabaseConnectionManager) -> dict[str, int]:
     """Aplica esquema, indices y datos cientificos de referencia en los tres motores."""
     # 1. PostgreSQL: migraciones + semilla cientifica verificable
-    pg_schema = (_DB_DIR / "postgresql" / "migrations" / "001_create_schema.sql").read_text(encoding="utf-8")
-    pg_indexes = (_DB_DIR / "postgresql" / "migrations" / "002_create_indexes.sql").read_text(encoding="utf-8")
-    pg_admin_ext = (_DB_DIR / "postgresql" / "migrations" / "003_admin_curation_extensions.sql").read_text(
-        encoding="utf-8"
-    )
-    pg_seed = (_DB_DIR / "postgresql" / "seeds" / "001_reference_fixture.sql").read_text(encoding="utf-8")
+    pg_schema = _read_db_asset("postgresql", "migrations", "001_create_schema.sql")
+    pg_indexes = _read_db_asset("postgresql", "migrations", "002_create_indexes.sql")
+    pg_admin_ext = _read_db_asset("postgresql", "migrations", "003_admin_curation_extensions.sql")
+    pg_seed = _read_db_asset("postgresql", "seeds", "001_reference_fixture.sql")
     seed_hashes = _get_seed_password_hashes()
 
     with manager.postgres.connection() as conn:
@@ -115,13 +127,12 @@ def apply_reference_fixture(manager: DatabaseConnectionManager) -> dict[str, int
 
     # 2. MongoDB: colecciones con $jsonSchema, indices y documentos de referencia
     mongo_db = manager.mongodb.get_database()
-    schemas_dir = _DB_DIR / "mongodb" / "schemas"
     for coll_name, schema_file in (
         ("taxon_dossier", "taxon_dossier.schema.json"),
         ("study_dossier", "study_dossier.schema.json"),
         ("raw_source_record", "raw_source_record.schema.json"),
     ):
-        validator = json.loads((schemas_dir / schema_file).read_text(encoding="utf-8"))
+        validator = json.loads(_read_db_asset("mongodb", "schemas", schema_file))
         if coll_name in mongo_db.list_collection_names():
             mongo_db.command("collMod", coll_name, validator=validator, validationLevel="strict", validationAction="error")
         else:
@@ -292,8 +303,8 @@ def apply_reference_fixture(manager: DatabaseConnectionManager) -> dict[str, int
         mongo_db["raw_source_record"].replace_one({"_id": raw_doc["_id"]}, raw_doc, upsert=True)
 
     # 3. Neo4j: constraints, indices, metadatos de localidades/taxones y proyeccion de PUBLISHED unicamente
-    constraints_cypher = (_DB_DIR / "neo4j" / "constraints" / "001_create_constraints.cypher").read_text(encoding="utf-8")
-    indexes_cypher = (_DB_DIR / "neo4j" / "indexes" / "001_create_indexes.cypher").read_text(encoding="utf-8")
+    constraints_cypher = _read_db_asset("neo4j", "constraints", "001_create_constraints.cypher")
+    indexes_cypher = _read_db_asset("neo4j", "indexes", "001_create_indexes.cypher")
     with manager.neo4j.session() as session:
         for stmt in constraints_cypher.split(";"):
             cleaned = "\n".join(line for line in stmt.splitlines() if not line.strip().startswith("//")).strip()

@@ -8,20 +8,21 @@ FROM python:3.14-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    BIOLINK_DATABASE_DIR=/app/database
 
 WORKDIR /app
 
 # Dependencias del sistema minimas para diagnostico y usuario no privilegiado
 RUN groupadd --system biolink && useradd --system --gid biolink biolink
 
-COPY requirements.lock pyproject.toml ./
+COPY requirements.lock pyproject.toml README.md ./
 RUN pip install --no-deps -r requirements.lock
 
 COPY src/ ./src/
 COPY database/ ./database/
 
-RUN pip install --no-deps --no-build-isolation -e . && chown -R biolink:biolink /app
+RUN pip install --no-deps -e . && chown -R biolink:biolink /app
 
 USER biolink
 
