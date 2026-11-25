@@ -80,6 +80,12 @@ cd biolink-backend
 copy .env.example .env
 docker compose up -d --build
 ```
+
+Para cargar el fixture de referencia después de que los servicios estén saludables:
+```powershell
+docker compose exec -T api python -c "from pathlib import Path; import os; p = Path(os.environ['BIOLINK_DATABASE_DIR']); print(p); print((p / 'postgresql/migrations/001_create_schema.sql').is_file())"
+docker compose exec -T api python -c "from biolink_backend.config.settings import get_settings; from biolink_backend.infrastructure.manager import DatabaseConnectionManager; from biolink_backend.infrastructure.reference_seeder import apply_reference_fixture; m = DatabaseConnectionManager(get_settings()); m.startup(); print(apply_reference_fixture(m)); m.shutdown()"
+```
 *(Antes de levantar `biolink-backend`, asegúrate de que ningún contenedor de `biolink-benchmarking` esté en ejecución para respetar el presupuesto de 4 GB).*
 
 ### 4.3 Endpoints Disponibles (`/api/v1`)
